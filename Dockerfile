@@ -18,17 +18,8 @@ EXPOSE 3000
 # Define environment variable
 ENV NODE_ENV=production
 
-# Create entrypoint script
-COPY <<EOF /usr/local/bin/entrypoint.sh
-#!/bin/sh
-# Start the Docker daemon
-dockerd &
-# Wait for Docker to be ready
-while ! docker info >/dev/null 2>&1; do sleep 1; done
-# Start the Node.js application
-exec node app.js
-EOF
-
+# Copy and set up entrypoint script
+COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Use the entrypoint script
