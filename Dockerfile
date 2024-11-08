@@ -1,10 +1,7 @@
-# Use an official Node.js runtime as a parent image
-FROM node:14
+FROM docker:dind
 
-# Install Docker
-RUN apt-get update && \
-    apt-get install -y docker.io && \
-    rm -rf /var/lib/apt/lists/*
+# Install Node.js and npm
+RUN apk add --update nodejs npm
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -21,5 +18,21 @@ EXPOSE 3000
 # Define environment variable
 ENV NODE_ENV=production
 
-# Run the app
-CMD ["node", "app.js"]
+# Create entrypoint script
+COPY <<EOF /usr/local/bin/entrypoint.sh
+#!/bin/sh
+# Start the Docker daemon
+dockerd &
+# Wait for Docker to be ready
+while ! docker info >/dev/null 2>&1; do sleep 1; done
+# Start the Node.js application
+exec node app.js
+EOF
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Use the entrypoint script
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+# Run container with privileged mode:
+# docker run --privileged -p 3000:3000 my-node-app
