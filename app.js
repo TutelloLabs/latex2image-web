@@ -14,6 +14,7 @@ const port = 80;
 
 const tempDir = "temp";
 const outputDir = "output";
+const staticDir = "static";
 
 // Checklist of valid formats from the frontend, to verify form values are correct
 const validFormats = ["SVG", "PNG", "JPG"];
@@ -54,8 +55,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Allow static html files and output files to be accessible
-// app.use("/", express.static(staticDir));
-// app.use("/output", express.static(outputDir));
+app.use("/", express.static(staticDir));
+app.use("/output", express.static(outputDir));
 
 const conversionRouter = promiseRouter();
 app.use(conversionRouter);
