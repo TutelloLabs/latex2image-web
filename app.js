@@ -140,6 +140,7 @@ conversionRouter.post("/convert", async (req, res) => {
 
 		// Upload the file to DigitalOcean Space
 		const fileContent = await fsPromises.readFile(outputFileName);
+		console.log("bucket name", process.env.DO_SPACES_BUCKET);
 		const params = {
 			Bucket: process.env.DO_SPACES_BUCKET,
 			Key: `img-${id}.${fileFormat}`,
