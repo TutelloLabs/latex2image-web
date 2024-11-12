@@ -2,6 +2,7 @@ const fs = require("fs");
 const fsPromises = fs.promises;
 const shell = require("shelljs");
 const express = require("express");
+const https = require("https");
 const promiseRouter = require("express-promise-router");
 const queue = require("express-queue");
 const sharp = require("sharp");
@@ -42,6 +43,11 @@ const unsupportedCommands = [
 ];
 
 const app = express();
+
+const options = {
+	key: fs.readFileSync("server.key"),
+	cert: fs.readFileSync("server.cert"),
+};
 
 const bodyParser = require("body-parser");
 app.use(bodyParser.json());
@@ -183,9 +189,12 @@ if (!fs.existsSync(outputDir)) {
 }
 
 // Start the server
-app.listen(port, () =>
-	console.log(`Latex2Image listening at http://localhost:${port}`),
-);
+// app.listen(port, () =>
+// 	console.log(`Latex2Image listening at http://localhost:${port}`),
+// );
+https.createServer(options, app).listen(443, () => {
+	console.log("HTTPS Server running with self-signed certificate");
+});
 
 //// Helper functions
 
