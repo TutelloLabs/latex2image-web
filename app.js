@@ -151,6 +151,7 @@ conversionRouter.post("/convert", async (req, res) => {
 
 		const uploadResult = await s3.upload(params).promise();
 		const imageURL = uploadResult.Location.replace(".lon1", ".lon1.cdn");
+		await fsPromises.unlink(outputFileName);
 
 		await cleanupTempFilesAsync(id);
 		res.end(JSON.stringify({ imageURL }));
