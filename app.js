@@ -6,8 +6,10 @@ const promiseRouter = require("express-promise-router");
 const queue = require("express-queue");
 const sharp = require("sharp");
 const Promise = require("bluebird");
+const AWS = require("aws-sdk");
+require("dotenv").config();
 
-const port = 3000;
+const port = 80;
 
 const staticDir = "static";
 const tempDir = "temp";
@@ -58,6 +60,17 @@ app.use(conversionRouter);
 // multiple concurrent Docker containers from exhausting system resources
 conversionRouter.use(queue({ activeLimit: 1, queuedLimit: -1 }));
 
+// Configure AWS SDK for DigitalOcean Spaces
+const s3 = new AWS.S3({
+	forcePathStyle: false,
+	endpoint: "https://ams3.digitaloceanspaces.com",
+	region: "us-east-1",
+	credentials: {
+		accessKeyId: process.env.DO_SPACES_KEY,
+		secretAccessKey: process.env.DO_SPACES_SECRET,
+	},
+});
+
 // Conversion request endpoint
 conversionRouter.post("/convert", async (req, res) => {
 	const id = generateID(); // Generate a unique ID for this request
@@ -107,7 +120,7 @@ conversionRouter.post("/convert", async (req, res) => {
 		await execAsync(getDockerCommand(id, outputScale));
 
 		const inputSvgFileName = `${tempDir}/${id}/equation.svg`;
-		const outputFileName = `${outputDir}/img-${id}.${fileFormat}`;
+		const outputFileName = `${tempDir}/${id}/img-${id}.${fileFormat}`;
 
 		// Return the SVG image, no further processing required
 		if (fileFormat === "svg") {
@@ -125,10 +138,21 @@ conversionRouter.post("/convert", async (req, res) => {
 				.toFile(outputFileName);
 		}
 
+		// Upload the file to DigitalOcean Space
+		const fileContent = await fsPromises.readFile(outputFileName);
+		const params = {
+			Bucket: process.env.DO_SPACES_BUCKET,
+			Key: `img-${id}.${fileFormat}`,
+			Body: fileContent,
+			ACL: "public-read",
+			ContentType: `image/${fileFormat}`,
+		};
+
+		const uploadResult = await s3.upload(params).promise();
+		const imageURL = uploadResult.Location;
+
 		await cleanupTempFilesAsync(id);
-		res.end(
-			JSON.stringify({ imageURL: `${httpOutputDir}/img-${id}.${fileFormat}` }),
-		);
+		res.end(JSON.stringify({ imageURL }));
 
 		// An exception occurred somewhere, return an error
 	} catch (e) {
@@ -161,40 +185,40 @@ app.listen(port, () =>
 // Get the LaTeX document template for the requested equation
 function getLatexTemplate(equation) {
 	return `
-    \\documentclass[12pt]{article}
-    \\usepackage{amsmath}
-    \\usepackage{amssymb}
-    \\usepackage{amsfonts}
-    \\usepackage{xcolor}
-    \\usepackage{siunitx}
-    \\usepackage[utf8]{inputenc}
-    \\thispagestyle{empty}
-    \\begin{document}
-    ${equation}
-    \\end{document}`;
+	\\documentclass[12pt]{article}
+	\\usepackage{amsmath}
+	\\usepackage{amssymb}
+	\\usepackage{amsfonts}
+	\\usepackage{xcolor}
+	\\usepackage{siunitx}
+	\\usepackage[utf8]{inputenc}
+	\\thispagestyle{empty}
+	\\begin{document}
+	${equation}
+	\\end{document}`;
 }
 
 // Get the final command responsible for launching the Docker container and generating a svg file
 function getDockerCommand(id, output_scale) {
 	// Commands to run within the container
 	const containerCmds = `
-    # Prevent LaTeX from reading/writing files in parent directories
-    echo 'openout_any = p\nopenin_any = p' > /tmp/texmf.cnf
-    export TEXMFCNF='/tmp:'
+	# Prevent LaTeX from reading/writing files in parent directories
+	echo 'openout_any = p\nopenin_any = p' > /tmp/texmf.cnf
+	export TEXMFCNF='/tmp:'
 
-    # Compile .tex file to .dvi file. Timeout kills it after 5 seconds if held up
-    timeout 5 latex -no-shell-escape -interaction=nonstopmode -halt-on-error equation.tex
+	# Compile .tex file to .dvi file. Timeout kills it after 5 seconds if held up
+	timeout 5 latex -no-shell-escape -interaction=nonstopmode -halt-on-error equation.tex
 
-    # Convert .dvi to .svg file. Timeout kills it after 5 seconds if held up
-    timeout 5 dvisvgm --no-fonts --scale=${output_scale} --exact equation.dvi`;
+	# Convert .dvi to .svg file. Timeout kills it after 5 seconds if held up
+	timeout 5 dvisvgm --no-fonts --scale=${output_scale} --exact equation.dvi`;
 
 	// Start the container in the appropriate directory and run commands within it.
 	// Files in this directory will be accessible under /data within the container.
 	return `
-    cd ${tempDir}/${id}
-    docker run --rm -i --user="$(id -u):$(id -g)" \
-        --net=none -v "$PWD":/data "blang/latex:ubuntu" \
-        /bin/bash -c "${containerCmds}"`;
+	cd ${tempDir}/${id}
+	docker run --rm -i --user="$(id -u):$(id -g)" \
+		--net=none -v "$PWD":/data "blang/latex:ubuntu" \
+		/bin/bash -c "${containerCmds}"`;
 }
 
 // Deletes temporary files created during a conversion request
