@@ -63,7 +63,7 @@ conversionRouter.use(queue({ activeLimit: 1, queuedLimit: -1 }));
 // Configure AWS SDK for DigitalOcean Spaces
 const s3 = new AWS.S3({
 	forcePathStyle: false,
-	endpoint: "https://ams3.digitaloceanspaces.com",
+	endpoint: "https://lon1.digitaloceanspaces.com",
 	region: "us-east-1",
 	credentials: {
 		accessKeyId: process.env.DO_SPACES_KEY,
