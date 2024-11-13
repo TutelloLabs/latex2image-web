@@ -55,8 +55,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Allow static html files and output files to be accessible
-app.use("/", express.static(staticDir));
-app.use("/output", express.static(outputDir));
+//app.use("/", express.static(staticDir));
+//app.use("/output", express.static(outputDir));
 
 const conversionRouter = promiseRouter();
 app.use(conversionRouter);
