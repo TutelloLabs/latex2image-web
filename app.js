@@ -46,8 +46,8 @@ const unsupportedCommands = [
 const app = express();
 
 const options = {
-	key: fs.readFileSync("fullchain.pem"),
-	cert: fs.readFileSync("privkey.pem"),
+	key: fs.readFileSync("privkey.pem"),
+	cert: fs.readFileSync("fullchain.pem"),
 };
 
 const bodyParser = require("body-parser");
